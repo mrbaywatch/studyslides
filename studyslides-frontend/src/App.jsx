@@ -56,21 +56,26 @@ export default function App() {
 
   // Poll for generation status
   useEffect(() => {
-    if (!generationId || generationStatus === 'completed' || generationStatus === 'failed') {
-      return;
-    }
+    if (!generationId) return;
+    if (generationStatus === 'failed') return;
+    // Keep polling even if completed but no download URLs
+    if (generationStatus === 'completed' && result?.pptxUrl) return;
 
     const pollStatus = async () => {
       try {
         const res = await fetch(`${API_URL}/api/status?id=${generationId}`);
         const data = await res.json();
         
+        console.log('Status poll:', data);
         setGenerationStatus(data.status);
         
-        if (data.status === 'completed') {
+        if (data.status === 'completed' && (data.pptxUrl || data.pdfUrl)) {
           setResult(data);
           setLoading(false);
           setView('result');
+        } else if (data.status === 'completed' || data.status === 'processing_export') {
+          // Keep polling - export URLs might still be generating
+          setResult(data); // Update result with latest data
         } else if (data.status === 'failed') {
           setError('Generation failed. Please try again.');
           setLoading(false);
@@ -80,9 +85,13 @@ export default function App() {
       }
     };
 
+    // Poll immediately
+    pollStatus();
+    
+    // Then poll every 3 seconds
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [generationId, generationStatus]);
+  }, [generationId, generationStatus, result?.pptxUrl]);
 
   // Start generation
   const startGeneration = async () => {
@@ -684,9 +693,11 @@ export default function App() {
           <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             <span>
-              {generationStatus === 'pending' && 'Starting...'}
+              {generationStatus === 'pending' && 'Starting generation...'}
               {generationStatus === 'processing' && 'Processing content...'}
               {generationStatus === 'generating' && 'Generating slides...'}
+              {generationStatus === 'completed' && 'Almost done...'}
+              {generationStatus === 'processing_export' && 'Preparing download files...'}
               {!generationStatus && 'Connecting...'}
             </span>
           </div>
