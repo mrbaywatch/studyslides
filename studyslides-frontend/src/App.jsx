@@ -723,43 +723,62 @@ export default function App() {
             </div>
 
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Your {format} is ready!</h1>
-            <p className="text-gray-600 mb-8">{result?.title || 'Successfully created'}</p>
+            <p className="text-gray-600 mb-8">Your AI-generated presentation has been created successfully.</p>
 
-            {result?.url && (
-              <a
-                href={result.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-100 hover:bg-blue-200 rounded-xl text-blue-700 font-medium mb-6"
+            {/* Download buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => downloadPresentation('pptx')}
+                disabled={!result?.pptxUrl}
+                className={`px-8 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
+                  result?.pptxUrl 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
               >
-                👁️ Preview & Edit
-              </a>
-            )}
-
-            <div className="flex gap-4 justify-center">
-              {result?.pptxUrl && (
-                <button
-                  onClick={() => downloadPresentation('pptx')}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium"
-                >
-                  📥 Download PPTX
-                </button>
-              )}
-              {result?.pdfUrl && (
-                <button
-                  onClick={() => downloadPresentation('pdf')}
-                  className="px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-medium"
-                >
-                  📄 Download PDF
-                </button>
-              )}
+                <span className="text-2xl">📥</span>
+                Download PowerPoint
+              </button>
+              
+              <button
+                onClick={() => downloadPresentation('pdf')}
+                disabled={!result?.pdfUrl}
+                className={`px-8 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
+                  result?.pdfUrl 
+                    ? 'bg-gray-800 hover:bg-gray-900 text-white shadow-lg hover:shadow-xl' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <span className="text-2xl">📄</span>
+                Download PDF
+              </button>
             </div>
 
-            {!result?.pptxUrl && !result?.pdfUrl && result?.url && (
-              <p className="text-sm text-gray-500 mt-4">
-                Use "Preview & Edit" to view and download your presentation
+            {/* Loading message if downloads not ready yet */}
+            {(!result?.pptxUrl && !result?.pdfUrl) && (
+              <div className="mt-6 p-4 bg-yellow-50 rounded-xl">
+                <p className="text-yellow-700 text-sm">
+                  ⏳ Downloads are being prepared... This may take a moment.
+                </p>
+              </div>
+            )}
+
+            {/* Credits used */}
+            {result?.creditsUsed && (
+              <p className="mt-6 text-sm text-gray-400">
+                Credits used: {result.creditsUsed}
               </p>
             )}
+          </div>
+
+          {/* Create another */}
+          <div className="mt-8 text-center">
+            <button
+              onClick={startNew}
+              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              ✨ Create another presentation
+            </button>
           </div>
         </main>
       </div>
