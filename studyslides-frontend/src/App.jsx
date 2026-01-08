@@ -1,538 +1,474 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const API_URL = 'https://studyslides-api-i3ef.vercel.app';
 
-const themes = {
-  midnight: { 
-    id: 'midnight', name: 'Midnight', 
-    background: '#0F172A', text: '#F8FAFC', accent: '#F59E0B', secondary: '#1E293B'
-  },
-  ocean: { 
-    id: 'ocean', name: 'Ocean', 
-    background: '#0C4A6E', text: '#F0F9FF', accent: '#38BDF8', secondary: '#075985'
-  },
-  forest: { 
-    id: 'forest', name: 'Forest', 
-    background: '#14532D', text: '#F0FDF4', accent: '#4ADE80', secondary: '#166534'
-  },
-  sunset: { 
-    id: 'sunset', name: 'Sunset', 
-    background: '#7C2D12', text: '#FFF7ED', accent: '#FB923C', secondary: '#9A3412'
-  },
-  minimal: { 
-    id: 'minimal', name: 'Minimal', 
-    background: '#FFFFFF', text: '#1E293B', accent: '#6366F1', secondary: '#F1F5F9'
-  },
-  dark: { 
-    id: 'dark', name: 'Dark', 
-    background: '#18181B', text: '#FAFAFA', accent: '#A855F7', secondary: '#27272A'
-  }
-};
+// Gamma themes (popular ones)
+const defaultThemes = [
+  { id: 'Starter', name: 'Starter', color: '#6366F1' },
+  { id: 'Oasis', name: 'Oasis', color: '#0EA5E9' },
+  { id: 'Verdant', name: 'Verdant', color: '#22C55E' },
+  { id: 'Ember', name: 'Ember', color: '#F97316' },
+  { id: 'Dusk', name: 'Dusk', color: '#8B5CF6' },
+  { id: 'Slate', name: 'Slate', color: '#64748B' },
+  { id: 'Midnight', name: 'Midnight', color: '#1E293B' },
+  { id: 'Rose', name: 'Rose', color: '#F43F5E' },
+];
 
-const presentationTypes = [
-  { id: 'academic', name: 'Academic', icon: '📚', desc: 'Research & essays' },
-  { id: 'project', name: 'Project', icon: '📋', desc: 'Class assignments' },
-  { id: 'thesis', name: 'Thesis', icon: '🎓', desc: 'Defense presentations' },
-  { id: 'pitch', name: 'Pitch', icon: '🚀', desc: 'Ideas & proposals' },
-  { id: 'report', name: 'Report', icon: '📖', desc: 'Book & lab reports' },
-  { id: 'science', name: 'Science', icon: '🔬', desc: 'Experiments & data' },
+const imageStyles = [
+  { id: 'photorealistic', name: 'Photorealistic', icon: '📷' },
+  { id: 'illustration', name: 'Illustration', icon: '🎨' },
+  { id: 'minimal', name: 'Minimal', icon: '◽' },
+  { id: '3d render', name: '3D Render', icon: '🎮' },
+  { id: 'watercolor', name: 'Watercolor', icon: '🖌️' },
+  { id: 'cartoon', name: 'Cartoon', icon: '✏️' },
+];
+
+const tones = [
+  { id: 'professional', name: 'Professional' },
+  { id: 'casual', name: 'Casual' },
+  { id: 'academic', name: 'Academic' },
+  { id: 'inspiring', name: 'Inspiring' },
+  { id: 'persuasive', name: 'Persuasive' },
+];
+
+const audiences = [
+  { id: 'general', name: 'General' },
+  { id: 'students', name: 'Students' },
+  { id: 'professionals', name: 'Professionals' },
+  { id: 'executives', name: 'Executives' },
+  { id: 'investors', name: 'Investors' },
 ];
 
 export default function App() {
   const [view, setView] = useState('landing');
+  const [createMode, setCreateMode] = useState(null); // 'generate', 'paste', 'import', 'template'
+  
+  // Input states
   const [prompt, setPrompt] = useState('');
-  const [slideCount, setSlideCount] = useState(8);
-  const [selectedTheme, setSelectedTheme] = useState('midnight');
-  const [presentationType, setPresentationType] = useState('academic');
-  const [outline, setOutline] = useState([]);
-  const [slides, setSlides] = useState([]);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [title, setTitle] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [importUrl, setImportUrl] = useState('');
+  
+  // Options
+  const [numCards, setNumCards] = useState(8);
+  const [selectedTheme, setSelectedTheme] = useState('Starter');
+  const [imageStyle, setImageStyle] = useState('photorealistic');
+  const [tone, setTone] = useState('professional');
+  const [audience, setAudience] = useState('general');
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
+  
+  // Generation state
+  const [generationId, setGenerationId] = useState(null);
+  const [generationStatus, setGenerationStatus] = useState(null);
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState(null);
 
-  const generateOutline = async () => {
-    if (!prompt.trim()) return;
+  // Poll for generation status
+  useEffect(() => {
+    if (!generationId || generationStatus === 'completed' || generationStatus === 'failed') {
+      return;
+    }
+
+    const pollStatus = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/status?id=${generationId}`);
+        const data = await res.json();
+        
+        setGenerationStatus(data.status);
+        
+        if (data.status === 'completed') {
+          setResult(data);
+          setLoading(false);
+          setView('result');
+        } else if (data.status === 'failed') {
+          setError('Generation failed. Please try again.');
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Status check failed:', err);
+      }
+    };
+
+    const interval = setInterval(pollStatus, 2000);
+    return () => clearInterval(interval);
+  }, [generationId, generationStatus]);
+
+  // Start generation
+  const startGeneration = async () => {
     setLoading(true);
-    setLoadingMsg('Researching your topic...');
     setError(null);
+    setGenerationStatus('pending');
+    setView('generating');
+
+    let inputText = '';
+    let textMode = 'generate';
+
+    switch (createMode) {
+      case 'generate':
+        inputText = prompt;
+        textMode = 'generate';
+        break;
+      case 'paste':
+        inputText = pastedText;
+        textMode = 'preserve';
+        break;
+      case 'import':
+        // Handle URL import separately
+        try {
+          const res = await fetch(`${API_URL}/api/import-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: importUrl,
+              themeId: selectedTheme,
+              numCards,
+              additionalInstructions
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          setGenerationId(data.generationId);
+          return;
+        } catch (err) {
+          setError(err.message);
+          setLoading(false);
+          return;
+        }
+      default:
+        inputText = prompt;
+    }
 
     try {
-      const res = await fetch(`${API_URL}/api/generate-outline`, {
+      const res = await fetch(`${API_URL}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: prompt, slideCount, presentationType })
+        body: JSON.stringify({
+          inputText,
+          textMode,
+          format: 'presentation',
+          themeId: selectedTheme,
+          numCards,
+          additionalInstructions,
+          exportAs: 'pptx',
+          textOptions: {
+            amount: 'medium',
+            tone,
+            audience
+          },
+          imageOptions: {
+            source: 'aiGenerated',
+            style: imageStyle
+          },
+          cardOptions: {
+            dimensions: '16x9'
+          }
+        })
       });
 
-      if (!res.ok) throw new Error('Failed to generate outline');
       const data = await res.json();
-      if (!data.outline?.length) throw new Error('No outline generated');
       
-      setOutline(data.outline);
-      setTitle(data.title || prompt);
-      setView('outline');
-    } catch (err) {
-      setError(`Error: ${err.message}. Please try again.`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateSlides = async () => {
-    setView('generating');
-    setLoading(true);
-    setSlides([]);
-    const generated = [];
-
-    for (let i = 0; i < outline.length; i++) {
-      setLoadingMsg(`Creating slide ${i + 1}: ${outline[i].title}`);
-      
-      try {
-        const res = await fetch(`${API_URL}/api/generate-slide`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slideOutline: outline[i], originalContent: prompt })
-        });
-
-        let slideContent = res.ok ? await res.json() : {};
-
-        generated.push({
-          id: outline[i].id,
-          type: outline[i].slideType,
-          title: slideContent.title || outline[i].title,
-          subtitle: slideContent.subtitle || outline[i].subtitle,
-          content: slideContent.content || outline[i].keyPoints || [],
-          statValue: slideContent.statValue,
-          statLabel: slideContent.statLabel,
-          quote: slideContent.quote,
-          quoteAuthor: slideContent.quoteAuthor,
-          imageUrl: slideContent.imageUrl,
-          imageKeyword: slideContent.imageKeyword || outline[i].imageKeyword,
-          theme: themes[selectedTheme]
-        });
-      } catch (err) {
-        generated.push({
-          id: outline[i].id,
-          type: outline[i].slideType,
-          title: outline[i].title,
-          content: outline[i].keyPoints || [],
-          theme: themes[selectedTheme]
-        });
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      setSlides([...generated]);
-      await new Promise(r => setTimeout(r, 200));
-    }
-
-    setLoading(false);
-    setView('preview');
-  };
-
-  const exportPPTX = async () => {
-    setLoading(true);
-    setLoadingMsg('Creating PowerPoint...');
-
-    try {
-      const res = await fetch(`${API_URL}/api/generate-pptx`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides, theme: selectedTheme, title })
-      });
-
-      if (!res.ok) throw new Error('Export failed');
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${title}.pptx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      setGenerationId(data.generationId);
     } catch (err) {
-      alert('Export failed. Please try again.');
-    } finally {
+      setError(err.message);
       setLoading(false);
+      setView('create');
     }
   };
 
-  // Theme preview
-  const ThemePreview = ({ theme, selected, onClick }) => (
-    <button
-      onClick={onClick}
-      className={`relative w-20 h-14 rounded-lg overflow-hidden transition-all ${
-        selected ? 'ring-2 ring-violet-500 ring-offset-2 scale-105' : 'hover:scale-105'
-      }`}
-      style={{ background: theme.background }}
-    >
-      <div className="absolute inset-1">
-        <div className="h-0.5 w-full rounded" style={{ background: theme.accent }} />
-        <div className="mt-1.5 mx-1 h-1.5 w-8 rounded" style={{ background: theme.text, opacity: 0.9 }} />
-        <div className="mt-1 mx-1 flex gap-1">
-          <div className="h-4 w-5 rounded" style={{ background: theme.secondary }} />
-          <div className="flex-1 space-y-0.5">
-            <div className="h-1 w-6 rounded" style={{ background: theme.text, opacity: 0.5 }} />
-            <div className="h-1 w-4 rounded" style={{ background: theme.text, opacity: 0.5 }} />
-          </div>
-        </div>
-      </div>
-      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-0.5 text-center">
-        {theme.name}
-      </div>
-    </button>
-  );
-
-  // Slide renderer with image support
-  const Slide = ({ slide, large }) => {
-    const t = slide.theme || themes[selectedTheme];
-    const hasImage = slide.imageUrl && ['imageRight', 'imageLeft', 'imageBackground', 'title', 'stats', 'quote'].includes(slide.type);
+  // Download presentation
+  const downloadPresentation = async (type = 'pptx') => {
+    if (!result) return;
     
-    // Generate fallback image URL if we have keyword but no URL
-    const imageUrl = slide.imageUrl || (slide.imageKeyword ? `https://source.unsplash.com/800x600/?${encodeURIComponent(slide.imageKeyword)}` : null);
-
-    const basePadding = large ? 'p-8' : 'p-3';
-    const titleSize = large ? 'text-3xl' : 'text-sm';
-    const subtitleSize = large ? 'text-lg' : 'text-xs';
-    const textSize = large ? 'text-base' : 'text-[10px]';
-    const smallSize = large ? 'text-sm' : 'text-[8px]';
-
-    // Title slide
-    if (slide.type === 'title') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative`} style={{ background: t.background }}>
-          {imageUrl && (
-            <>
-              <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/50" />
-            </>
-          )}
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className={`relative z-10 h-full flex flex-col items-center justify-center text-center ${basePadding}`}>
-            <h1 className={`${titleSize} font-bold text-white mb-2`}>{slide.title}</h1>
-            {slide.subtitle && <p className={`${subtitleSize} text-white/70`}>{slide.subtitle}</p>}
-            <div className={`${large ? 'mt-6 w-20 h-1' : 'mt-2 w-8 h-0.5'} rounded`} style={{ background: t.accent }} />
-          </div>
-        </div>
-      );
+    const url = type === 'pdf' ? result.pdfUrl : result.pptxUrl;
+    if (!url) {
+      alert(`${type.toUpperCase()} download not available`);
+      return;
     }
 
-    // Image Right
-    if (slide.type === 'imageRight') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative ${basePadding}`} style={{ background: t.background, color: t.text }}>
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className="h-full flex gap-4">
-            <div className="flex-1 flex flex-col">
-              <h2 className={`${titleSize} font-bold mb-3`}>{slide.title}</h2>
-              <div className="space-y-2">
-                {slide.content?.slice(0, 4).map((c, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className={`${large ? 'w-2 h-2 mt-1.5' : 'w-1 h-1 mt-1'} rounded-full flex-shrink-0`} style={{ background: t.accent }} />
-                    <span className={textSize}>{c}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {imageUrl && (
-              <div className={`${large ? 'w-2/5' : 'w-1/3'} flex-shrink-0`}>
-                <div className="h-full rounded-lg overflow-hidden" style={{ background: t.secondary }}>
-                  <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // Image Left
-    if (slide.type === 'imageLeft') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative ${basePadding}`} style={{ background: t.background, color: t.text }}>
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className="h-full flex gap-4">
-            {imageUrl && (
-              <div className={`${large ? 'w-2/5' : 'w-1/3'} flex-shrink-0`}>
-                <div className="h-full rounded-lg overflow-hidden" style={{ background: t.secondary }}>
-                  <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                </div>
-              </div>
-            )}
-            <div className="flex-1 flex flex-col">
-              <h2 className={`${titleSize} font-bold mb-3`}>{slide.title}</h2>
-              <div className="space-y-2">
-                {slide.content?.slice(0, 4).map((c, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className={`${large ? 'w-2 h-2 mt-1.5' : 'w-1 h-1 mt-1'} rounded-full flex-shrink-0`} style={{ background: t.accent }} />
-                    <span className={textSize}>{c}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Image Background
-    if (slide.type === 'imageBackground') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative`} style={{ background: t.background }}>
-          {imageUrl && (
-            <>
-              <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/50" />
-            </>
-          )}
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className={`relative z-10 h-full flex flex-col items-center justify-center text-center ${basePadding}`}>
-            <h2 className={`${titleSize} font-bold text-white mb-4`}>{slide.title}</h2>
-            <div className="space-y-2 max-w-lg">
-              {slide.content?.slice(0, 3).map((c, i) => (
-                <p key={i} className={`${textSize} text-white/90`}>{c}</p>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Stats
-    if (slide.type === 'stats') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative ${basePadding}`} style={{ background: t.background, color: t.text }}>
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className="h-full flex gap-4">
-            <div className="flex-1">
-              <h2 className={`${subtitleSize} font-bold mb-2`}>{slide.title}</h2>
-              <p className={`${large ? 'text-6xl' : 'text-2xl'} font-bold`} style={{ color: t.accent }}>
-                {slide.statValue || '73%'}
-              </p>
-              <p className={`${smallSize} opacity-60 mt-1`}>{slide.statLabel}</p>
-              {slide.content?.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  {slide.content.slice(0, 2).map((c, i) => (
-                    <div key={i} className="flex items-start gap-1">
-                      <span className="w-1 h-1 rounded-full mt-1" style={{ background: t.accent }} />
-                      <span className={smallSize}>{c}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {imageUrl && (
-              <div className={`${large ? 'w-1/3' : 'w-1/4'} flex-shrink-0`}>
-                <div className="h-full rounded-lg overflow-hidden">
-                  <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // Quote
-    if (slide.type === 'quote') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative`} style={{ background: t.background }}>
-          {imageUrl && (
-            <>
-              <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/60" />
-            </>
-          )}
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className={`relative z-10 h-full flex flex-col items-center justify-center text-center ${basePadding}`}>
-            <span className={`${large ? 'text-6xl' : 'text-2xl'} opacity-40`} style={{ color: t.accent }}>"</span>
-            <p className={`${textSize} italic text-white max-w-lg -mt-2`}>
-              {slide.quote || slide.content?.[0]}
-            </p>
-            {slide.quoteAuthor && (
-              <p className={`${smallSize} mt-3`} style={{ color: t.accent }}>— {slide.quoteAuthor}</p>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // Two Column
-    if (slide.type === 'twoColumn') {
-      const mid = Math.ceil((slide.content?.length || 0) / 2);
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative ${basePadding}`} style={{ background: t.background, color: t.text }}>
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <h2 className={`${titleSize} font-bold mb-3`}>{slide.title}</h2>
-          <div className="flex gap-3 h-[calc(100%-2rem)]">
-            <div className="flex-1 rounded-lg p-3" style={{ background: t.secondary }}>
-              {slide.content?.slice(0, mid).map((c, i) => (
-                <div key={i} className="flex items-start gap-1 mb-2">
-                  <span className="w-1 h-1 rounded-full mt-1" style={{ background: t.accent }} />
-                  <span className={smallSize}>{c}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex-1 rounded-lg p-3" style={{ background: t.secondary }}>
-              {slide.content?.slice(mid).map((c, i) => (
-                <div key={i} className="flex items-start gap-1 mb-2">
-                  <span className="w-1 h-1 rounded-full mt-1" style={{ background: t.accent }} />
-                  <span className={smallSize}>{c}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Conclusion
-    if (slide.type === 'conclusion') {
-      return (
-        <div className={`aspect-video rounded-lg overflow-hidden relative ${basePadding}`} style={{ background: t.background, color: t.text }}>
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-          <div className="h-full flex flex-col items-center justify-center text-center">
-            <h2 className={`${titleSize} font-bold mb-4`}>{slide.title}</h2>
-            <div className="space-y-2 mb-4">
-              {slide.content?.map((c, i) => (
-                <p key={i} className={textSize}>✓ {c}</p>
-              ))}
-            </div>
-            <span className={`px-4 py-1.5 rounded-full ${smallSize} font-medium`} style={{ background: t.accent, color: t.background }}>
-              Thank You!
-            </span>
-          </div>
-        </div>
-      );
-    }
-
-    // Default content
-    return (
-      <div className={`aspect-video rounded-lg overflow-hidden relative ${basePadding}`} style={{ background: t.background, color: t.text }}>
-        <div className="absolute top-0 left-0 right-0 h-1" style={{ background: t.accent }} />
-        <h2 className={`${titleSize} font-bold mb-3`}>{slide.title}</h2>
-        <div className="space-y-2">
-          {slide.content?.map((c, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className={`${large ? 'w-2 h-2 mt-1.5' : 'w-1 h-1 mt-1'} rounded-full flex-shrink-0`} style={{ background: t.accent }} />
-              <span className={textSize}>{c}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    // Use proxy to hide Gamma URL
+    const downloadUrl = `${API_URL}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(result.title || 'presentation')}`;
+    
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `${result.title || 'presentation'}.${type}`;
+    a.click();
   };
 
-  // VIEWS
+  // Reset and start new
+  const startNew = () => {
+    setView('landing');
+    setCreateMode(null);
+    setPrompt('');
+    setPastedText('');
+    setImportUrl('');
+    setGenerationId(null);
+    setGenerationStatus(null);
+    setResult(null);
+    setError(null);
+  };
 
+  // LANDING VIEW
   if (view === 'landing') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <nav className="flex items-center justify-between px-8 py-5">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">S</div>
-            <span className="text-xl font-semibold">StudySlides</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">S</div>
+            <span className="text-xl font-bold">StudySlides</span>
           </div>
-          <button onClick={() => setView('create')} className="px-5 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-full">
-            Get Started
-          </button>
         </nav>
 
-        <section className="max-w-4xl mx-auto px-8 pt-20 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 border border-gray-200 mb-8">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-sm text-gray-600">100% Free • With Images</span>
+        <main className="max-w-5xl mx-auto px-8 pt-16">
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold text-gray-900 mb-4">
+              Create with AI
+            </h1>
+            <p className="text-xl text-gray-600">
+              How would you like to get started?
+            </p>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
-            Beautiful AI Presentations
-            <br />
-            <span className="bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">for Students</span>
-          </h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Generate */}
+            <button
+              onClick={() => { setCreateMode('generate'); setView('create'); }}
+              className="group bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-violet-200 transition-all text-left"
+            >
+              <div className="h-32 rounded-xl bg-gradient-to-br from-orange-300 via-pink-400 to-purple-500 mb-4 flex items-center justify-center overflow-hidden">
+                <span className="text-5xl">✨</span>
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">Generate</h3>
+              <p className="text-sm text-gray-500">Create from a one-line prompt in a few seconds</p>
+            </button>
 
-          <p className="text-xl text-gray-600 max-w-xl mx-auto mb-10">
-            Generate stunning slides with images, real content, and professional layouts in seconds.
-          </p>
+            {/* Paste in text */}
+            <button
+              onClick={() => { setCreateMode('paste'); setView('create'); }}
+              className="group bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-violet-200 transition-all text-left"
+            >
+              <div className="h-32 rounded-xl bg-gradient-to-br from-purple-400 via-pink-500 to-indigo-600 mb-4 flex items-center justify-center">
+                <span className="text-4xl font-bold text-white">Aa</span>
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">Paste in text</h3>
+              <p className="text-sm text-gray-500">Create from notes, an outline, or existing content</p>
+            </button>
 
-          <button onClick={() => setView('create')} className="px-8 py-4 text-lg font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-full shadow-lg">
-            Start Creating →
-          </button>
+            {/* Import file or URL */}
+            <button
+              onClick={() => { setCreateMode('import'); setView('create'); }}
+              className="group bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-violet-200 transition-all text-left"
+            >
+              <div className="h-32 rounded-xl bg-gradient-to-br from-green-300 via-teal-400 to-cyan-500 mb-4 flex items-center justify-center">
+                <span className="text-5xl">📤</span>
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">Import URL</h3>
+              <p className="text-sm text-gray-500">Enhance existing docs, presentations, or webpages</p>
+            </button>
 
-          <div className="flex items-center justify-center gap-6 mt-8 text-sm text-gray-500">
-            <span>✓ Auto images</span>
-            <span>✓ 6 themes</span>
-            <span>✓ Export to PPTX</span>
+            {/* Templates */}
+            <button
+              onClick={() => { setCreateMode('generate'); setView('create'); }}
+              className="group bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-violet-200 transition-all text-left relative"
+            >
+              <div className="h-32 rounded-xl bg-gradient-to-br from-pink-300 via-rose-400 to-red-500 mb-4 flex items-center justify-center">
+                <span className="text-5xl">📑</span>
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 mb-2">Quick Start</h3>
+              <p className="text-sm text-gray-500">Start with suggested topics for students</p>
+              <span className="absolute top-4 right-4 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">POPULAR</span>
+            </button>
           </div>
-        </section>
+
+          <div className="mt-12 text-center text-sm text-gray-500">
+            <p>✨ AI-powered presentations • 🎨 Beautiful designs • 📥 Export to PowerPoint</p>
+          </div>
+        </main>
       </div>
     );
   }
 
+  // CREATE VIEW
   if (view === 'create') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <nav className="flex items-center justify-between px-8 py-5 border-b bg-white/80 backdrop-blur">
-          <button onClick={() => setView('landing')} className="text-gray-600 hover:text-gray-900">← Back</button>
-          <span className="font-semibold">StudySlides</span>
+          <button onClick={startNew} className="text-gray-600 hover:text-gray-900 flex items-center gap-2">
+            ← Back
+          </button>
+          <span className="font-bold">StudySlides</span>
           <div className="w-16" />
         </nav>
 
         <main className="max-w-2xl mx-auto px-8 py-10">
           <div className="bg-white rounded-2xl shadow-sm border p-8">
-            <h2 className="text-2xl font-bold mb-2">What's your presentation about?</h2>
-            <p className="text-gray-500 mb-6">We'll create slides with real content and relevant images.</p>
+            
+            {/* Mode-specific input */}
+            {createMode === 'generate' && (
+              <>
+                <h2 className="text-2xl font-bold mb-2">What's your presentation about?</h2>
+                <p className="text-gray-500 mb-6">Enter a topic and we'll create a beautiful presentation</p>
+                <textarea
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  placeholder="e.g., The impact of climate change on ocean ecosystems"
+                  className="w-full h-32 px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none text-lg"
+                />
+              </>
+            )}
 
-            <textarea
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              placeholder="e.g., The impact of social media on teenage mental health"
-              className="w-full h-28 px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none text-lg"
-            />
+            {createMode === 'paste' && (
+              <>
+                <h2 className="text-2xl font-bold mb-2">Paste your content</h2>
+                <p className="text-gray-500 mb-6">Add notes, outline, or existing text to transform</p>
+                <textarea
+                  value={pastedText}
+                  onChange={e => setPastedText(e.target.value)}
+                  placeholder="Paste your notes, outline, bullet points, or any text content here..."
+                  className="w-full h-48 px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                />
+              </>
+            )}
 
+            {createMode === 'import' && (
+              <>
+                <h2 className="text-2xl font-bold mb-2">Import from URL</h2>
+                <p className="text-gray-500 mb-6">Enter a webpage URL to transform into a presentation</p>
+                <input
+                  type="url"
+                  value={importUrl}
+                  onChange={e => setImportUrl(e.target.value)}
+                  placeholder="https://example.com/article"
+                  className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 text-lg"
+                />
+              </>
+            )}
+
+            {/* Number of slides */}
             <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">Type</label>
-              <div className="grid grid-cols-3 gap-3">
-                {presentationTypes.map(t => (
-                  <button key={t.id} onClick={() => setPresentationType(t.id)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      presentationType === t.id ? 'border-violet-500 bg-violet-50' : 'border-gray-100 bg-gray-50'
-                    }`}>
-                    <span className="text-xl">{t.icon}</span>
-                    <p className="font-medium mt-1 text-sm">{t.name}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">Slides</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Number of slides</label>
               <div className="flex gap-2">
-                {[5, 8, 10, 12].map(n => (
-                  <button key={n} onClick={() => setSlideCount(n)}
-                    className={`flex-1 py-3 rounded-xl text-sm font-medium ${
-                      slideCount === n ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
-                    }`}>
+                {[5, 8, 10, 12, 15].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setNumCards(n)}
+                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
+                      numCards === n
+                        ? 'bg-violet-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
                     {n}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Theme */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">Theme</label>
-              <div className="flex flex-wrap gap-3">
-                {Object.values(themes).map(t => (
-                  <ThemePreview key={t.id} theme={t} selected={selectedTheme === t.id} onClick={() => setSelectedTheme(t.id)} />
+              <div className="flex flex-wrap gap-2">
+                {defaultThemes.map(theme => (
+                  <button
+                    key={theme.id}
+                    onClick={() => setSelectedTheme(theme.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      selectedTheme === theme.id
+                        ? 'ring-2 ring-violet-500 ring-offset-2'
+                        : 'hover:bg-gray-100'
+                    }`}
+                    style={{ backgroundColor: theme.color + '20', color: theme.color }}
+                  >
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: theme.color }} />
+                    {theme.name}
+                  </button>
                 ))}
               </div>
             </div>
 
-            {error && <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl text-sm">{error}</div>}
+            {/* Image Style */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">Image style</label>
+              <div className="flex flex-wrap gap-2">
+                {imageStyles.map(style => (
+                  <button
+                    key={style.id}
+                    onClick={() => setImageStyle(style.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      imageStyle === style.id
+                        ? 'bg-violet-100 text-violet-700 ring-2 ring-violet-500'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span>{style.icon}</span>
+                    {style.name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            <button onClick={generateOutline} disabled={loading || !prompt.trim()}
-              className={`w-full mt-8 py-4 rounded-xl font-semibold text-lg ${
-                !loading && prompt.trim() ? 'bg-gray-900 text-white hover:bg-gray-800' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}>
-              {loading ? loadingMsg : 'Generate Outline →'}
+            {/* Tone & Audience */}
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tone</label>
+                <select
+                  value={tone}
+                  onChange={e => setTone(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  {tones.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Audience</label>
+                <select
+                  value={audience}
+                  onChange={e => setAudience(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  {audiences.map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Additional Instructions */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional instructions <span className="text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={additionalInstructions}
+                onChange={e => setAdditionalInstructions(e.target.value)}
+                placeholder="e.g., Focus on recent statistics, include case studies"
+                className="w-full px-4 py-2 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Generate Button */}
+            <button
+              onClick={startGeneration}
+              disabled={loading || (createMode === 'generate' && !prompt.trim()) || (createMode === 'paste' && !pastedText.trim()) || (createMode === 'import' && !importUrl.trim())}
+              className={`w-full mt-8 py-4 rounded-xl font-semibold text-lg transition-all ${
+                !loading
+                  ? 'bg-violet-600 text-white hover:bg-violet-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Generate Presentation →
             </button>
           </div>
         </main>
@@ -540,118 +476,141 @@ export default function App() {
     );
   }
 
-  if (view === 'outline') {
+  // GENERATING VIEW
+  if (view === 'generating') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-        <nav className="flex items-center justify-between px-8 py-5 border-b bg-white">
-          <button onClick={() => setView('create')} className="text-gray-600">← Back</button>
-          <span className="text-sm text-gray-500">{outline.length} slides</span>
-          <button onClick={generateSlides} className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium">
-            Generate Slides →
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-8">
+          <div className="relative w-24 h-24 mx-auto mb-8">
+            <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
+            <div className="absolute inset-3 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <span className="text-2xl">✨</span>
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Creating Your Presentation</h2>
+          <p className="text-gray-600 mb-2">AI is designing beautiful slides for you...</p>
+          
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+            <span>
+              {generationStatus === 'pending' && 'Starting generation...'}
+              {generationStatus === 'processing' && 'Processing your content...'}
+              {generationStatus === 'generating' && 'Generating slides...'}
+              {!generationStatus && 'Connecting...'}
+            </span>
+          </div>
+
+          {error && (
+            <div className="mt-8 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+              {error}
+              <button onClick={startNew} className="block mt-2 text-red-600 underline">
+                Try again
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // RESULT VIEW
+  if (view === 'result') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <nav className="flex items-center justify-between px-8 py-5 border-b bg-white/80 backdrop-blur">
+          <span className="font-bold">StudySlides</span>
+          <button
+            onClick={startNew}
+            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg font-medium"
+          >
+            + New Presentation
           </button>
         </nav>
 
-        <main className="max-w-2xl mx-auto px-8 py-10">
-          <h1 className="text-2xl font-bold mb-2">{title}</h1>
-          <p className="text-gray-500 mb-8">Review outline • Images will be added automatically</p>
+        <main className="max-w-3xl mx-auto px-8 py-12">
+          <div className="bg-white rounded-2xl shadow-lg border p-8 text-center">
+            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+              <span className="text-4xl">🎉</span>
+            </div>
 
-          <div className="space-y-3">
-            {outline.map((item, i) => (
-              <div key={item.id} className="bg-white rounded-xl p-5 border shadow-sm">
-                <div className="flex items-start gap-4">
-                  <span className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center font-bold">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold">{item.title}</h3>
-                      <span className="px-2 py-0.5 text-xs bg-gray-100 rounded-full">{item.slideType}</span>
-                      {item.imageKeyword && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">📷 {item.imageKeyword}</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {result?.title || 'Your Presentation is Ready!'}
+            </h1>
+            <p className="text-gray-600 mb-8">
+              Your AI-generated presentation has been created successfully.
+            </p>
+
+            {/* Preview link */}
+            {result?.url && (
+              <a
+                href={result.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-700 font-medium mb-6"
+              >
+                <span>👁️</span> Preview Online
+              </a>
+            )}
+
+            {/* Download buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => downloadPresentation('pptx')}
+                className="flex-1 sm:flex-none px-8 py-4 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-2"
+              >
+                <span>📥</span> Download PowerPoint
+              </button>
+              
+              <button
+                onClick={() => downloadPresentation('pdf')}
+                className="flex-1 sm:flex-none px-8 py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-2"
+              >
+                <span>📄</span> Download PDF
+              </button>
+            </div>
+
+            {/* Credits info */}
+            {result?.creditsUsed && (
+              <p className="mt-6 text-sm text-gray-500">
+                Credits used: {result.creditsUsed}
+              </p>
+            )}
+          </div>
+
+          {/* Quick actions */}
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              onClick={startNew}
+              className="p-4 bg-white rounded-xl border hover:border-violet-300 hover:shadow transition-all text-left"
+            >
+              <span className="text-2xl mb-2 block">✨</span>
+              <p className="font-medium">Create Another</p>
+              <p className="text-sm text-gray-500">Start a new presentation</p>
+            </button>
+
+            <button
+              onClick={() => { setView('create'); }}
+              className="p-4 bg-white rounded-xl border hover:border-violet-300 hover:shadow transition-all text-left"
+            >
+              <span className="text-2xl mb-2 block">🔄</span>
+              <p className="font-medium">Edit Settings</p>
+              <p className="text-sm text-gray-500">Regenerate with changes</p>
+            </button>
+
+            <a
+              href={result?.url || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 bg-white rounded-xl border hover:border-violet-300 hover:shadow transition-all text-left"
+            >
+              <span className="text-2xl mb-2 block">🌐</span>
+              <p className="font-medium">Share Link</p>
+              <p className="text-sm text-gray-500">Get shareable URL</p>
+            </a>
           </div>
         </main>
-      </div>
-    );
-  }
-
-  if (view === 'generating') {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="text-center max-w-lg mx-auto px-8">
-          <div className="relative w-20 h-20 mx-auto mb-8">
-            <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Creating Your Slides</h2>
-          <p className="text-gray-600 mb-8">{loadingMsg}</p>
-          
-          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${(slides.length / outline.length) * 100}%` }} />
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 mt-8">
-            {slides.map((s, i) => (
-              <div key={i} className="rounded shadow-sm overflow-hidden">
-                <Slide slide={s} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === 'preview') {
-    return (
-      <div className="min-h-screen bg-[#1a1a1e] text-white flex">
-        <div className="w-56 border-r border-white/10 flex flex-col bg-[#141416]">
-          <div className="p-4 border-b border-white/10">
-            <button onClick={() => setView('outline')} className="text-sm text-gray-400 hover:text-white">← Edit</button>
-          </div>
-          <div className="flex-1 overflow-auto p-3 space-y-2">
-            {slides.map((s, i) => (
-              <button key={i} onClick={() => setCurrentSlide(i)}
-                className={`w-full rounded-lg overflow-hidden transition-all ${currentSlide === i ? 'ring-2 ring-violet-500' : 'opacity-60 hover:opacity-100'}`}>
-                <Slide slide={s} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#141416]">
-            <h2 className="font-medium truncate">{title}</h2>
-            <div className="flex gap-3">
-              <button onClick={() => { setView('landing'); setSlides([]); setOutline([]); setPrompt(''); }} 
-                className="px-4 py-2 text-sm bg-white/5 hover:bg-white/10 rounded-lg">New</button>
-              <button onClick={exportPPTX} disabled={loading}
-                className="px-4 py-2 text-sm bg-violet-600 hover:bg-violet-500 rounded-lg font-medium disabled:opacity-50">
-                {loading ? 'Exporting...' : 'Export PPTX'}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 p-8 flex items-center justify-center bg-[#0a0a0c]">
-            <div className="w-full max-w-5xl shadow-2xl rounded-xl overflow-hidden">
-              {slides[currentSlide] && <Slide slide={slides[currentSlide]} large />}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-4 p-4 border-t border-white/10 bg-[#141416]">
-            <button onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))} disabled={currentSlide === 0}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg disabled:opacity-30">← Prev</button>
-            <span className="text-sm text-gray-400">{currentSlide + 1} / {slides.length}</span>
-            <button onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))} disabled={currentSlide === slides.length - 1}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg disabled:opacity-30">Next →</button>
-          </div>
-        </div>
       </div>
     );
   }
