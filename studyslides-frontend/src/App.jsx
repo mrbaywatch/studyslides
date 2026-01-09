@@ -58,8 +58,12 @@ export default function App() {
   useEffect(() => {
     if (!generationId) return;
     if (generationStatus === 'failed') return;
-    // Keep polling even if completed but no download URLs
-    if (generationStatus === 'completed' && result?.pptxUrl) return;
+    // Stop polling if we have result with URL
+    if (result?.url && (generationStatus === 'completed' || generationStatus === 'processing_export')) {
+      setLoading(false);
+      setView('result');
+      return;
+    }
 
     const pollStatus = async () => {
       try {
@@ -69,16 +73,16 @@ export default function App() {
         console.log('Status poll:', data);
         setGenerationStatus(data.status);
         
-        if (data.status === 'completed' && (data.pptxUrl || data.pdfUrl)) {
+        // If we have a gamma URL, we're done (even if no download URLs)
+        if (data.url && (data.status === 'completed' || data.status === 'processing_export')) {
           setResult(data);
           setLoading(false);
           setView('result');
-        } else if (data.status === 'completed' || data.status === 'processing_export') {
-          // Keep polling - export URLs might still be generating
-          setResult(data); // Update result with latest data
         } else if (data.status === 'failed') {
           setError('Generation failed. Please try again.');
           setLoading(false);
+        } else {
+          setResult(data);
         }
       } catch (err) {
         console.error('Status check failed:', err);
@@ -91,7 +95,7 @@ export default function App() {
     // Then poll every 3 seconds
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [generationId, generationStatus, result?.pptxUrl]);
+  }, [generationId, generationStatus, result?.url]);
 
   // Start generation
   const startGeneration = async () => {
@@ -715,6 +719,14 @@ export default function App() {
 
   // RESULT VIEW
   if (view === 'result') {
+    // Extract document ID from Gamma URL for export links
+    const gammaUrl = result?.url;
+    let docId = null;
+    if (gammaUrl) {
+      const match = gammaUrl.match(/\/docs\/([^\/\?]+)/);
+      if (match) docId = match[1];
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100">
         <nav className="flex items-center justify-between px-8 py-5">
@@ -738,41 +750,40 @@ export default function App() {
 
             {/* Download buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() => downloadPresentation('pptx')}
-                disabled={!result?.pptxUrl}
-                className={`px-8 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
-                  result?.pptxUrl 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl' 
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                <span className="text-2xl">📥</span>
-                Download PowerPoint
-              </button>
-              
-              <button
-                onClick={() => downloadPresentation('pdf')}
-                disabled={!result?.pdfUrl}
-                className={`px-8 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
-                  result?.pdfUrl 
-                    ? 'bg-gray-800 hover:bg-gray-900 text-white shadow-lg hover:shadow-xl' 
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                <span className="text-2xl">📄</span>
-                Download PDF
-              </button>
+              {docId ? (
+                <>
+                  <a
+                    href={`https://gamma.app/docs/${docId}/export/pptx`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    <span className="text-2xl">📥</span>
+                    Download PowerPoint
+                  </a>
+                  
+                  <a
+                    href={`https://gamma.app/docs/${docId}/export/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    <span className="text-2xl">📄</span>
+                    Download PDF
+                  </a>
+                </>
+              ) : (
+                <a
+                  href={gammaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
+                >
+                  <span className="text-2xl">📥</span>
+                  Open & Download
+                </a>
+              )}
             </div>
-
-            {/* Loading message if downloads not ready yet */}
-            {(!result?.pptxUrl && !result?.pdfUrl) && (
-              <div className="mt-6 p-4 bg-yellow-50 rounded-xl">
-                <p className="text-yellow-700 text-sm">
-                  ⏳ Downloads are being prepared... This may take a moment.
-                </p>
-              </div>
-            )}
 
             {/* Credits used */}
             {result?.creditsUsed && (
