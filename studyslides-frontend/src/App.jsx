@@ -67,8 +67,8 @@ export default function App() {
       return;
     }
     
-    // Stop after 90 polls (7.5 minutes at 5 sec intervals) to prevent infinite polling
-    if (pollCount > 90) {
+    // Stop after 40 polls (10 minutes at 15 sec intervals) to prevent infinite polling
+    if (pollCount > 40) {
       // Even without download URL, show result with gamma URL
       if (result?.gammaUrl) {
         setLoading(false);
@@ -115,8 +115,8 @@ export default function App() {
     // Poll immediately
     pollStatus();
     
-    // Then poll every 5 seconds (slower to give Gamma time)
-    const interval = setInterval(pollStatus, 5000);
+    // Then poll every 15 seconds (give Gamma plenty of time)
+    const interval = setInterval(pollStatus, 15000);
     return () => clearInterval(interval);
   }, [generationId, generationStatus, result?.downloadUrl, pollCount]);
 
@@ -732,7 +732,7 @@ export default function App() {
           </div>
           
           <h2 className="text-2xl font-bold text-gray-900 mb-3">Creating your {format}</h2>
-          <p className="text-gray-600 mb-2">This usually takes 30-90 seconds...</p>
+          <p className="text-gray-600 mb-2">This may take a few minutes for larger presentations...</p>
           
           <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -741,7 +741,7 @@ export default function App() {
           
           {pollCount > 0 && (
             <p className="mt-4 text-xs text-gray-400">
-              Checking status... ({pollCount}/60)
+              Checking status... ({pollCount}/40)
             </p>
           )}
 
