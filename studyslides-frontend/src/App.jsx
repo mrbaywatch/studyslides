@@ -67,8 +67,8 @@ export default function App() {
       return;
     }
     
-    // Stop after 60 polls (3 minutes) to prevent infinite polling
-    if (pollCount > 60) {
+    // Stop after 90 polls (7.5 minutes at 5 sec intervals) to prevent infinite polling
+    if (pollCount > 90) {
       // Even without download URL, show result with gamma URL
       if (result?.gammaUrl) {
         setLoading(false);
@@ -95,11 +95,12 @@ export default function App() {
           return;
         }
         
-        // If completed/waiting_for_export with gamma URL but no download URL,
-        // keep polling a bit longer (export takes extra time)
-        if ((data.status === 'completed' || data.status === 'waiting_for_export') && data.gammaUrl) {
-          console.log('Waiting for export URL...');
-          // Don't stop - keep polling for the download URL
+        // If completed with gamma URL (even without download URL), show result
+        if (data.status === 'completed' && data.gammaUrl) {
+          console.log('Completed with gammaUrl:', data.gammaUrl);
+          setLoading(false);
+          setView('result');
+          return;
         }
         
         if (data.status === 'failed') {
@@ -114,8 +115,8 @@ export default function App() {
     // Poll immediately
     pollStatus();
     
-    // Then poll every 3 seconds
-    const interval = setInterval(pollStatus, 3000);
+    // Then poll every 5 seconds (slower to give Gamma time)
+    const interval = setInterval(pollStatus, 5000);
     return () => clearInterval(interval);
   }, [generationId, generationStatus, result?.downloadUrl, pollCount]);
 
