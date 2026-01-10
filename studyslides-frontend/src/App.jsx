@@ -55,35 +55,46 @@ export default function App() {
   const [error, setError] = useState(null);
   const [pollCount, setPollCount] = useState(0);
 
-  // Poll for generation status - with extended polling for download URL
+  // Poll for generation status
   useEffect(() => {
     if (!generationId) return;
     if (generationStatus === 'failed') return;
     
-    // Stop if we have a download URL
+    // Stop if we have download URL
     if (result?.downloadUrl) {
       setLoading(false);
       setView('result');
       return;
     }
-    
-    // Stop after 40 polls (10 minutes at 15 sec intervals) to prevent infinite polling
-    if (pollCount > 40) {
-      // Even without download URL, show result with gamma URL
-      if (result?.gammaUrl) {
-        setLoading(false);
-        setView('result');
-      }
-      return;
-    }
+
+    let isCancelled = false;
+    let pollNumber = 0;
+    const maxPolls = 40; // 40 polls x 15 seconds = 10 minutes max
+    const pollInterval = 15000; // 15 seconds
 
     const pollStatus = async () => {
+      if (isCancelled) return;
+      
+      pollNumber++;
+      setPollCount(pollNumber);
+      
+      if (pollNumber > maxPolls) {
+        // Timeout - show result with whatever we have
+        if (result?.gammaUrl) {
+          setLoading(false);
+          setView('result');
+        } else {
+          setError('Generation timed out. Please try again.');
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const res = await fetch(`${API_URL}/api/status?id=${generationId}`);
         const data = await res.json();
         
-        console.log(`Poll #${pollCount + 1}:`, data);
-        setPollCount(prev => prev + 1);
+        console.log(`Poll #${pollNumber}:`, data);
         setGenerationStatus(data.status);
         setResult(data);
         
@@ -95,7 +106,7 @@ export default function App() {
           return;
         }
         
-        // If completed with gamma URL (even without download URL), show result
+        // If completed with gamma URL, show result
         if (data.status === 'completed' && data.gammaUrl) {
           console.log('Completed with gammaUrl:', data.gammaUrl);
           setLoading(false);
@@ -106,19 +117,29 @@ export default function App() {
         if (data.status === 'failed') {
           setError('Generation failed. Please try again.');
           setLoading(false);
+          return;
+        }
+        
+        // Schedule next poll
+        if (!isCancelled) {
+          setTimeout(pollStatus, pollInterval);
         }
       } catch (err) {
         console.error('Status check failed:', err);
+        // Retry on error
+        if (!isCancelled) {
+          setTimeout(pollStatus, pollInterval);
+        }
       }
     };
 
-    // Poll immediately
+    // Start polling immediately
     pollStatus();
-    
-    // Then poll every 15 seconds (give Gamma plenty of time)
-    const interval = setInterval(pollStatus, 15000);
-    return () => clearInterval(interval);
-  }, [generationId, generationStatus, result?.downloadUrl, pollCount]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [generationId]); // Only depend on generationId
 
   // Start generation
   const startGeneration = async () => {
