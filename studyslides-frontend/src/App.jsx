@@ -326,8 +326,34 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100">
         <nav className="flex items-center justify-between px-8 py-5">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">S</div>
-            <span className="text-xl font-bold text-gray-800">StudySlides</span>
+            <div className="w-10 h-10 flex items-center justify-center">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Incomplete circle outline */}
+                <path d="M20 5 C28.284 5 35 11.716 35 20 C35 28.284 28.284 35 20 35" 
+                      stroke="url(#logoGradient)" strokeWidth="2.5" fill="none" 
+                      strokeLinecap="round" strokeLinejoin="round"/>
+                {/* Left DNA strand with dots */}
+                <path d="M14 10 Q12 15 14 20 Q12 25 14 30" 
+                      stroke="url(#logoGradient)" strokeWidth="2" fill="none" 
+                      strokeLinecap="round" strokeDasharray="2 3"/>
+                {/* Right DNA strand with dots */}
+                <path d="M26 10 Q28 15 26 20 Q28 25 26 30" 
+                      stroke="url(#logoGradient)" strokeWidth="2" fill="none" 
+                      strokeLinecap="round" strokeDasharray="2 3"/>
+                {/* Base pairs (horizontal bars connecting strands) */}
+                <line x1="14" y1="13" x2="26" y2="13" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="18" x2="26" y2="18" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="22" x2="26" y2="22" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="27" x2="26" y2="27" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="logoGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#7C3AED" />
+                    <stop offset="100%" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-b from-purple-600 to-pink-500 bg-clip-text text-transparent">IntelliClone</span>
           </div>
         </nav>
 
@@ -785,8 +811,34 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100">
         <nav className="flex items-center justify-between px-8 py-5">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold">S</div>
-            <span className="text-xl font-bold">StudySlides</span>
+            <div className="w-10 h-10 flex items-center justify-center">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Incomplete circle outline */}
+                <path d="M20 5 C28.284 5 35 11.716 35 20 C35 28.284 28.284 35 20 35" 
+                      stroke="url(#logoGradient2)" strokeWidth="2.5" fill="none" 
+                      strokeLinecap="round" strokeLinejoin="round"/>
+                {/* Left DNA strand with dots */}
+                <path d="M14 10 Q12 15 14 20 Q12 25 14 30" 
+                      stroke="url(#logoGradient2)" strokeWidth="2" fill="none" 
+                      strokeLinecap="round" strokeDasharray="2 3"/>
+                {/* Right DNA strand with dots */}
+                <path d="M26 10 Q28 15 26 20 Q28 25 26 30" 
+                      stroke="url(#logoGradient2)" strokeWidth="2" fill="none" 
+                      strokeLinecap="round" strokeDasharray="2 3"/>
+                {/* Base pairs (horizontal bars connecting strands) */}
+                <line x1="14" y1="13" x2="26" y2="13" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="18" x2="26" y2="18" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="22" x2="26" y2="22" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="27" x2="26" y2="27" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="logoGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#7C3AED" />
+                    <stop offset="100%" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-b from-purple-600 to-pink-500 bg-clip-text text-transparent">IntelliClone</span>
           </div>
           <button onClick={startNew} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
             + Create New
