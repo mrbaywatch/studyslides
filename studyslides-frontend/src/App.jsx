@@ -53,15 +53,27 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pollCount, setPollCount] = useState(0);
 
-  // Poll for generation status
+  // Poll for generation status - with extended polling for download URL
   useEffect(() => {
     if (!generationId) return;
     if (generationStatus === 'failed') return;
-    // Stop polling if we have result with URL
-    if (result?.url && (generationStatus === 'completed' || generationStatus === 'processing_export')) {
+    
+    // Stop if we have a download URL
+    if (result?.downloadUrl) {
       setLoading(false);
       setView('result');
+      return;
+    }
+    
+    // Stop after 60 polls (3 minutes) to prevent infinite polling
+    if (pollCount > 60) {
+      // Even without download URL, show result with gamma URL
+      if (result?.gammaUrl) {
+        setLoading(false);
+        setView('result');
+      }
       return;
     }
 
@@ -70,19 +82,29 @@ export default function App() {
         const res = await fetch(`${API_URL}/api/status?id=${generationId}`);
         const data = await res.json();
         
-        console.log('Status poll:', data);
+        console.log(`Poll #${pollCount + 1}:`, data);
+        setPollCount(prev => prev + 1);
         setGenerationStatus(data.status);
+        setResult(data);
         
-        // If we have a gamma URL, we're done (even if no download URLs)
-        if (data.url && (data.status === 'completed' || data.status === 'processing_export')) {
-          setResult(data);
+        // If we have a download URL, we're done!
+        if (data.downloadUrl) {
+          console.log('Download URL found:', data.downloadUrl);
           setLoading(false);
           setView('result');
-        } else if (data.status === 'failed') {
+          return;
+        }
+        
+        // If completed/waiting_for_export with gamma URL but no download URL,
+        // keep polling a bit longer (export takes extra time)
+        if ((data.status === 'completed' || data.status === 'waiting_for_export') && data.gammaUrl) {
+          console.log('Waiting for export URL...');
+          // Don't stop - keep polling for the download URL
+        }
+        
+        if (data.status === 'failed') {
           setError('Generation failed. Please try again.');
           setLoading(false);
-        } else {
-          setResult(data);
         }
       } catch (err) {
         console.error('Status check failed:', err);
@@ -95,13 +117,15 @@ export default function App() {
     // Then poll every 3 seconds
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [generationId, generationStatus, result?.url]);
+  }, [generationId, generationStatus, result?.downloadUrl, pollCount]);
 
   // Start generation
   const startGeneration = async () => {
     setLoading(true);
     setError(null);
     setGenerationStatus('pending');
+    setPollCount(0);
+    setResult(null);
     setView('generating');
 
     let inputText = '';
@@ -173,13 +197,19 @@ export default function App() {
     setGenerationStatus(null);
     setResult(null);
     setError(null);
+    setPollCount(0);
   };
 
-  // Download
-  const downloadPresentation = (type = 'pptx') => {
-    if (!result) return;
-    const url = type === 'pdf' ? result.pdfUrl : result.pptxUrl;
-    if (url) window.open(url, '_blank');
+  // Download via proxy (white-label)
+  const downloadPresentation = () => {
+    if (result?.downloadUrl) {
+      // Use our proxy to hide Gamma URL
+      const proxyUrl = `${API_URL}/api/download?url=${encodeURIComponent(result.downloadUrl)}`;
+      window.open(proxyUrl, '_blank');
+    } else if (result?.gammaUrl) {
+      // Fallback: open Gamma URL
+      window.open(result.gammaUrl, '_blank');
+    }
   };
 
   // Shared Components
@@ -680,6 +710,15 @@ export default function App() {
 
   // GENERATING VIEW
   if (view === 'generating') {
+    const getStatusMessage = () => {
+      if (generationStatus === 'pending') return 'Starting generation...';
+      if (generationStatus === 'processing') return 'Processing content...';
+      if (generationStatus === 'generating') return 'Generating slides...';
+      if (generationStatus === 'completed') return 'Finalizing presentation...';
+      if (generationStatus === 'waiting_for_export') return 'Preparing download file...';
+      return 'Connecting...';
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-8">
@@ -692,19 +731,18 @@ export default function App() {
           </div>
           
           <h2 className="text-2xl font-bold text-gray-900 mb-3">Creating your {format}</h2>
-          <p className="text-gray-600 mb-2">This usually takes 30-60 seconds...</p>
+          <p className="text-gray-600 mb-2">This usually takes 30-90 seconds...</p>
           
           <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span>
-              {generationStatus === 'pending' && 'Starting generation...'}
-              {generationStatus === 'processing' && 'Processing content...'}
-              {generationStatus === 'generating' && 'Generating slides...'}
-              {generationStatus === 'completed' && 'Almost done...'}
-              {generationStatus === 'processing_export' && 'Preparing download files...'}
-              {!generationStatus && 'Connecting...'}
-            </span>
+            <span>{getStatusMessage()}</span>
           </div>
+          
+          {pollCount > 0 && (
+            <p className="mt-4 text-xs text-gray-400">
+              Checking status... ({pollCount}/60)
+            </p>
+          )}
 
           {error && (
             <div className="mt-8 p-4 bg-red-100 text-red-700 rounded-xl text-sm">
@@ -719,14 +757,8 @@ export default function App() {
 
   // RESULT VIEW
   if (view === 'result') {
-    // Extract document ID from Gamma URL for export links
-    const gammaUrl = result?.url;
-    let docId = null;
-    if (gammaUrl) {
-      const match = gammaUrl.match(/\/docs\/([^\/\?]+)/);
-      if (match) docId = match[1];
-    }
-
+    const hasDownloadUrl = !!result?.downloadUrl;
+    
     return (
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100">
         <nav className="flex items-center justify-between px-8 py-5">
@@ -746,48 +778,42 @@ export default function App() {
             </div>
 
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Your {format} is ready!</h1>
-            <p className="text-gray-600 mb-8">Your AI-generated presentation has been created successfully.</p>
+            <p className="text-gray-600 mb-8">
+              {hasDownloadUrl 
+                ? 'Click below to download your presentation.'
+                : 'Your presentation has been created successfully.'}
+            </p>
 
-            {/* Download buttons */}
+            {/* Download button */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {docId ? (
-                <>
-                  <a
-                    href={`https://gamma.app/docs/${docId}/export/pptx`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
-                  >
-                    <span className="text-2xl">📥</span>
-                    Download PowerPoint
-                  </a>
-                  
-                  <a
-                    href={`https://gamma.app/docs/${docId}/export/pdf`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-8 py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
-                  >
-                    <span className="text-2xl">📄</span>
-                    Download PDF
-                  </a>
-                </>
-              ) : (
-                <a
-                  href={gammaUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
-                >
-                  <span className="text-2xl">📥</span>
-                  Open & Download
-                </a>
+              <button
+                onClick={downloadPresentation}
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl"
+              >
+                <span className="text-2xl">📥</span>
+                {hasDownloadUrl ? 'Download PowerPoint' : 'Open Presentation'}
+              </button>
+            </div>
+
+            {!hasDownloadUrl && result?.gammaUrl && (
+              <p className="mt-4 text-sm text-gray-500">
+                Click "Export" in the toolbar to download as PowerPoint
+              </p>
+            )}
+
+            {/* Debug info */}
+            <div className="mt-6 text-xs text-gray-400">
+              {hasDownloadUrl ? '✅ Direct download available' : '⚠️ Using fallback link'}
+              {result?.availableKeys && (
+                <div className="mt-1">
+                  Response keys: {result.availableKeys.join(', ')}
+                </div>
               )}
             </div>
 
             {/* Credits used */}
             {result?.creditsUsed && (
-              <p className="mt-6 text-sm text-gray-400">
+              <p className="mt-4 text-sm text-gray-400">
                 Credits used: {result.creditsUsed}
               </p>
             )}
