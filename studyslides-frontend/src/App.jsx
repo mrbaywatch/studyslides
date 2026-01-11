@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const API_URL = 'https://studyslides-api-i3ef.vercel.app';
+const PRICE_PER_SLIDE = 20; // NOK
 
 // Format options
 const formats = [
@@ -10,14 +11,110 @@ const formats = [
   { id: 'social', name: 'Social', icon: '📱' },
 ];
 
-// Example prompts for Generate
-const examplePrompts = [
-  { icon: '📷', text: 'Photography portfolio presentation for [name]' },
-  { icon: '🏎️', text: 'F1 Legends' },
-  { icon: '💼', text: 'Negotiating and closing deals to meet or exceed sales targets' },
-  { icon: '📈', text: 'Digital marketing trends' },
-  { icon: '🌍', text: 'What is the origin of language' },
-  { icon: '📚', text: 'Book report for "The Joy Luck Club"' },
+// All example prompts (will show 6 at a time, shuffle to see more)
+const allExamplePrompts = [
+  { icon: '📷', text: 'Photography portfolio presentation' },
+  { icon: '🏎️', text: 'F1 Legends and their greatest races' },
+  { icon: '💼', text: 'Sales techniques for closing deals' },
+  { icon: '📈', text: 'Digital marketing trends 2025' },
+  { icon: '🌍', text: 'The origin of human language' },
+  { icon: '📚', text: 'Book report for "The Great Gatsby"' },
+  { icon: '🚀', text: 'SpaceX and the future of space travel' },
+  { icon: '🧠', text: 'How artificial intelligence works' },
+  { icon: '🌱', text: 'Sustainable living tips for beginners' },
+  { icon: '🎮', text: 'The evolution of video games' },
+  { icon: '🏋️', text: 'Home workout routines for busy people' },
+  { icon: '🍕', text: 'The history of Italian cuisine' },
+  { icon: '🎬', text: 'How movies are made: from script to screen' },
+  { icon: '💰', text: 'Personal finance basics for students' },
+  { icon: '🌊', text: 'Ocean conservation and marine life' },
+  { icon: '🏰', text: 'Medieval castles of Europe' },
+  { icon: '🎵', text: 'The evolution of pop music' },
+  { icon: '🔬', text: 'CRISPR and gene editing explained' },
+  { icon: '☕', text: 'The global coffee industry' },
+  { icon: '🐕', text: 'Dog breeds and their characteristics' },
+  { icon: '🏥', text: 'Healthcare systems around the world' },
+  { icon: '✈️', text: 'Budget travel tips for Europe' },
+  { icon: '🎨', text: 'Modern art movements explained' },
+  { icon: '🌋', text: 'Volcanoes and how they form' },
+  { icon: '📱', text: 'The history of smartphones' },
+  { icon: '🧘', text: 'Meditation and mindfulness guide' },
+  { icon: '🏠', text: 'Interior design trends for small spaces' },
+  { icon: '🌸', text: 'Japanese culture and traditions' },
+  { icon: '⚽', text: 'World Cup history and memorable moments' },
+  { icon: '🎓', text: 'Study tips for better grades' },
+];
+
+// All Gamma themes - colors derived from Gamma's colorKeywords
+const themeOptions = [
+  // Light themes
+  { id: 'default-light', name: 'Basic Light', colors: { bg: '#ffffff', accent: '#3b82f6', text: '#1e293b' }, category: 'Light' },
+  { id: 'ash', name: 'Ash', colors: { bg: '#f8fafc', accent: '#64748b', text: '#0f172a' }, category: 'Light' },
+  { id: 'breeze', name: 'Breeze', colors: { bg: '#f0f9ff', accent: '#0ea5e9', text: '#0c4a6e' }, category: 'Light' },
+  { id: 'chimney-smoke', name: 'Chimney Smoke', colors: { bg: '#f1f5f9', accent: '#94a3b8', text: '#1e293b' }, category: 'Light' },
+  { id: 'cornflower', name: 'Cornflower', colors: { bg: '#eff6ff', accent: '#3b82f6', text: '#1e40af' }, category: 'Light' },
+  { id: 'consultant', name: 'Consultant', colors: { bg: '#f8fafc', accent: '#2563eb', text: '#1e3a8a' }, category: 'Professional' },
+  { id: 'commons', name: 'Commons', colors: { bg: '#f8fafc', accent: '#22c55e', text: '#14532d' }, category: 'Light' },
+  { id: 'gleam', name: 'Gleam', colors: { bg: '#f8fafc', accent: '#6b7280', text: '#111827' }, category: 'Professional' },
+  { id: 'howlite', name: 'Howlite', colors: { bg: '#ffffff', accent: '#18181b', text: '#09090b' }, category: 'Light' },
+  { id: 'icebreaker', name: 'Icebreaker', colors: { bg: '#f0f9ff', accent: '#0369a1', text: '#0c4a6e' }, category: 'Light' },
+  { id: 'dialogue', name: 'Dialogue', colors: { bg: '#fffbeb', accent: '#f97316', text: '#7c2d12' }, category: 'Light' },
+  { id: 'daydream', name: 'Daydream', colors: { bg: '#faf5ff', accent: '#a855f7', text: '#581c87' }, category: 'Colorful' },
+  
+  // Warm/Earthy themes
+  { id: 'creme', name: 'Creme', colors: { bg: '#fefce8', accent: '#a16207', text: '#422006' }, category: 'Light' },
+  { id: 'dune', name: 'Dune', colors: { bg: '#fef3c7', accent: '#b45309', text: '#78350f' }, category: 'Light' },
+  { id: 'chisel', name: 'Chisel', colors: { bg: '#faf5f0', accent: '#92400e', text: '#451a03' }, category: 'Light' },
+  { id: 'finesse', name: 'Finesse', colors: { bg: '#f5f5f0', accent: '#65a30d', text: '#365314' }, category: 'Light' },
+  { id: 'flax', name: 'Flax', colors: { bg: '#faf5f0', accent: '#a3886a', text: '#44403c' }, category: 'Light' },
+  { id: 'daktilo', name: 'Daktilo', colors: { bg: '#fefce8', accent: '#78716c', text: '#292524' }, category: 'Light' },
+  { id: 'clementa', name: 'Clementa', colors: { bg: '#fef2e8', accent: '#ea580c', text: '#431407' }, category: 'Light' },
+  { id: 'chocolate', name: 'Chocolate', colors: { bg: '#44403c', accent: '#fbbf96', text: '#fef2f2' }, category: 'Dark' },
+  { id: 'cigar', name: 'Cigar', colors: { bg: '#292524', accent: '#b45309', text: '#fef3c7' }, category: 'Dark' },
+  { id: 'cornfield', name: 'Cornfield', colors: { bg: '#fefce8', accent: '#65a30d', text: '#365314' }, category: 'Light' },
+  
+  // Pink/Coral themes
+  { id: 'coral-glow', name: 'Coral Glow', colors: { bg: '#fff1f2', accent: '#fb7185', text: '#881337' }, category: 'Colorful' },
+  { id: 'ashrose', name: 'Ashrose', colors: { bg: '#fdf4ff', accent: '#c084fc', text: '#581c87' }, category: 'Light' },
+  { id: 'ag4mc9ggtxi8iyi', name: 'Flamingo', colors: { bg: '#fff1f2', accent: '#f472b6', text: '#9d174d' }, category: 'Colorful' },
+  { id: 'bubble-gum', name: 'Bubble Gum', colors: { bg: '#27272a', accent: '#f472b6', text: '#fdf2f8' }, category: 'Dark' },
+  { id: 'atmosphere', name: 'Atmosphere', colors: { bg: '#fdf4ff', accent: '#f97316', text: '#7c2d12' }, category: 'Colorful' },
+  
+  // Purple/Gradient themes  
+  { id: 'gamma', name: 'Gamma', colors: { bg: '#fef3f2', accent: '#f97316', text: '#7c2d12' }, category: 'Colorful' },
+  { id: 'elysia', name: 'Elysia', colors: { bg: '#faf5ff', accent: '#06b6d4', text: '#164e63' }, category: 'Colorful' },
+  { id: 'electric', name: 'Electric', colors: { bg: '#1e1b4b', accent: '#f97316', text: '#fef3f2' }, category: 'Dark' },
+  { id: 'aurora', name: 'Aurora', colors: { bg: '#1e1b4b', accent: '#e879f9', text: '#fdf4ff' }, category: 'Dark' },
+  { id: 'nova', name: 'Nova', colors: { bg: '#fdf4ff', accent: '#d946ef', text: '#701a75' }, category: 'Colorful' },
+  
+  // Dark themes
+  { id: 'default-dark', name: 'Basic Dark', colors: { bg: '#1e293b', accent: '#3b82f6', text: '#f1f5f9' }, category: 'Dark' },
+  { id: 'coal', name: 'Coal', colors: { bg: '#18181b', accent: '#a1a1aa', text: '#fafafa' }, category: 'Dark' },
+  { id: 'chimney-dust', name: 'Chimney Dust', colors: { bg: '#27272a', accent: '#71717a', text: '#e4e4e7' }, category: 'Dark' },
+  { id: 'founder', name: 'Founder', colors: { bg: '#0f172a', accent: '#6366f1', text: '#e0e7ff' }, category: 'Dark' },
+  { id: 'dawn', name: 'Dawn', colors: { bg: '#1e293b', accent: '#f472b6', text: '#fdf2f8' }, category: 'Dark' },
+  { id: 'editoria', name: 'Editoria', colors: { bg: '#292524', accent: '#a8a29e', text: '#fafaf9' }, category: 'Dark' },
+  
+  // Blue themes
+  { id: 'blues', name: 'Blues', colors: { bg: '#1e3a8a', accent: '#60a5fa', text: '#eff6ff' }, category: 'Dark' },
+  { id: 'blue-steel', name: 'Blue Steel', colors: { bg: '#1e293b', accent: '#3b82f6', text: '#dbeafe' }, category: 'Dark' },
+  { id: 'borealis', name: 'Borealis', colors: { bg: '#0f172a', accent: '#2dd4bf', text: '#ccfbf1' }, category: 'Dark' },
+  { id: 'blueberry', name: 'Blueberry', colors: { bg: '#312e81', accent: '#c084fc', text: '#f5f3ff' }, category: 'Dark' },
+  
+  // Neon/Vibrant themes
+  { id: 'alien', name: 'Alien', colors: { bg: '#14532d', accent: '#4ade80', text: '#dcfce7' }, category: 'Dark' },
+  { id: 'fluo', name: 'Fluo', colors: { bg: '#18181b', accent: '#a3e635', text: '#ecfccb' }, category: 'Dark' },
+  { id: 'atacama', name: 'Atacama', colors: { bg: '#18181b', accent: '#ec4899', text: '#fdf2f8' }, category: 'Dark' },
+  { id: 'canaveral', name: 'Canaveral', colors: { bg: '#18181b', accent: '#f97316', text: '#fff7ed' }, category: 'Dark' },
+  
+  // Gold/Luxury themes
+  { id: 'aurum', name: 'Aurum', colors: { bg: '#18181b', accent: '#fbbf24', text: '#fef3c7' }, category: 'Dark' },
+  { id: 'gold-leaf', name: 'Gold Leaf', colors: { bg: '#fffbeb', accent: '#d97706', text: '#78350f' }, category: 'Light' },
+  
+  // Misc themes
+  { id: 'bee-happy', name: 'Bee Happy', colors: { bg: '#18181b', accent: '#facc15', text: '#fef9c3' }, category: 'Dark' },
+  { id: 'bonan-hale', name: 'Bonan Hale', colors: { bg: '#18181b', accent: '#facc15', text: '#fafafa' }, category: 'Dark' },
+  { id: 'gamma-dark', name: 'Gamma Dark', colors: { bg: '#3b0764', accent: '#fb923c', text: '#fef3f2' }, category: 'Dark' },
 ];
 
 // Text mode options for Paste
@@ -26,6 +123,16 @@ const textModes = [
   { id: 'condense', name: 'Summarize long text or document', desc: 'Great for condensing detailed content into something more presentable' },
   { id: 'preserve', name: 'Preserve this exact text', desc: 'Create using your text, exactly as you\'ve written it' },
 ];
+
+// Helper function to shuffle array
+const shuffleArray = (array) => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
 
 export default function App() {
   const [view, setView] = useState('landing');
@@ -37,6 +144,14 @@ export default function App() {
   const [selectedTheme, setSelectedTheme] = useState('');
   const [language, setLanguage] = useState('en');
   
+  // Example prompts state (for shuffling)
+  const [displayedPrompts, setDisplayedPrompts] = useState(allExamplePrompts.slice(0, 6));
+  
+  // Theme modal state
+  const [showThemeModal, setShowThemeModal] = useState(false);
+  const [themeFilter, setThemeFilter] = useState('Light');
+  const [themeSearch, setThemeSearch] = useState('');
+  
   // Generate mode
   const [prompt, setPrompt] = useState('');
   
@@ -46,6 +161,8 @@ export default function App() {
   
   // Import mode
   const [importUrl, setImportUrl] = useState('');
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [fileContent, setFileContent] = useState('');
   
   // Generation state
   const [generationId, setGenerationId] = useState(null);
@@ -54,6 +171,125 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pollCount, setPollCount] = useState(0);
+  
+  // Payment state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentSessionId, setPaymentSessionId] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Check for successful payment on page load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const sessionId = urlParams.get('session_id');
+    const canceled = urlParams.get('canceled');
+    
+    if (success === 'true' && sessionId) {
+      // Payment successful - verify and start generation
+      verifyPaymentAndGenerate(sessionId);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (canceled === 'true') {
+      setError('Payment was canceled. Please try again.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Verify payment and start generation
+  const verifyPaymentAndGenerate = async (sessionId) => {
+    setLoading(true);
+    setView('generating');
+    setError(null);
+    
+    try {
+      // Verify payment
+      const verifyRes = await fetch(`${API_URL}/api/verify-payment?session_id=${sessionId}`);
+      const verifyData = await verifyRes.json();
+      
+      if (!verifyData.paid) {
+        throw new Error('Payment not completed');
+      }
+      
+      // Start generation with verified session
+      const requestBody = {
+        inputText: verifyData.prompt || prompt,
+        textMode: 'generate',
+        format: verifyData.format || format,
+        numCards: verifyData.numSlides,
+        sessionId: sessionId,
+        textOptions: {
+          language: verifyData.language || language
+        }
+      };
+      
+      if (verifyData.theme) {
+        requestBody.themeId = verifyData.theme;
+      }
+
+      const res = await fetch(`${API_URL}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      const data = await res.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setGenerationId(data.generationId);
+      setGenerationStatus('pending');
+      setPollCount(0);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+      setView('landing');
+    }
+  };
+
+  // Initiate payment
+  const initiatePayment = async () => {
+    if (!prompt.trim()) {
+      setError('Please enter a prompt first');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setError(null);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/create-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numSlides: numCards,
+          prompt: prompt,
+          theme: selectedTheme,
+          language: language,
+          format: format
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err.message);
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Shuffle example prompts
+  const shufflePrompts = () => {
+    const shuffled = shuffleArray(allExamplePrompts);
+    setDisplayedPrompts(shuffled.slice(0, 6));
+  };
 
   // Poll for generation status
   useEffect(() => {
@@ -285,18 +521,179 @@ export default function App() {
     </div>
   );
 
-  const ThemeDropdown = () => (
-    <select
-      value={selectedTheme}
-      onChange={e => setSelectedTheme(e.target.value)}
-      className="bg-white rounded-full px-4 py-2 shadow-sm border text-sm font-medium text-gray-700 cursor-pointer"
+  const ThemeDropdown = () => {
+    const currentTheme = themeOptions.find(t => t.id === selectedTheme) || themeOptions[0];
+    return (
+      <button
+        onClick={() => setShowThemeModal(true)}
+        className="bg-white rounded-full px-4 py-2 shadow-sm border text-sm font-medium text-gray-700 cursor-pointer hover:border-blue-300 transition-all flex items-center gap-2"
+      >
+        <div 
+          className="w-4 h-4 rounded"
+          style={{ backgroundColor: currentTheme.colors.bg, border: '1px solid #e5e7eb' }}
+        />
+        {currentTheme.name}
+        <span className="text-gray-400 text-xs">▼</span>
+      </button>
+    );
+  };
+
+  // Theme Preview Card - like Gamma
+  const ThemeCard = ({ theme, isSelected, onClick }) => (
+    <button
+      onClick={onClick}
+      className={`relative rounded-lg overflow-hidden border-2 transition-all hover:shadow-md w-full ${
+        isSelected ? 'border-blue-500' : 'border-gray-200 hover:border-gray-300'
+      }`}
     >
-      <option value="">🎨 Classic</option>
-      <option value="modern">✨ Modern</option>
-      <option value="minimal">◽ Minimal</option>
-      <option value="bold">🔥 Bold</option>
-    </select>
+      {/* Theme preview box */}
+      <div 
+        className="p-3 h-20"
+        style={{ backgroundColor: theme.colors.bg }}
+      >
+        <div 
+          className="text-sm font-semibold mb-1"
+          style={{ color: theme.colors.text }}
+        >
+          Title
+        </div>
+        <div 
+          className="text-xs"
+          style={{ color: theme.colors.text, opacity: 0.8 }}
+        >
+          Body & <span style={{ color: theme.colors.accent, textDecoration: 'underline' }}>link</span>
+        </div>
+      </div>
+      
+      {/* Theme name below */}
+      <div className="py-1.5 text-center bg-white border-t">
+        <span className="text-xs font-medium text-gray-700">{theme.name}</span>
+      </div>
+      
+      {/* Selected checkmark */}
+      {isSelected && (
+        <div className="absolute top-1.5 left-1.5 w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
+          <span className="text-white text-xs">✓</span>
+        </div>
+      )}
+    </button>
   );
+
+  // Theme Modal - like Gamma with working scroll and filters
+  const ThemeModal = () => {
+    if (!showThemeModal) return null;
+    
+    const categories = ['Dark', 'Light', 'Professional', 'Colorful'];
+    
+    // Filter by category and search
+    let filteredThemes = themeOptions;
+    if (themeFilter) {
+      filteredThemes = filteredThemes.filter(t => t.category === themeFilter);
+    }
+    if (themeSearch.trim()) {
+      filteredThemes = themeOptions.filter(t => 
+        t.name.toLowerCase().includes(themeSearch.toLowerCase())
+      );
+    }
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        onClick={(e) => e.target === e.currentTarget && setShowThemeModal(false)}
+      >
+        <div 
+          className="bg-white rounded-xl shadow-2xl flex flex-col"
+          style={{ width: '340px', maxHeight: '85vh' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header - fixed */}
+          <div className="p-4 border-b flex-shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">All themes</h2>
+                <p className="text-xs text-gray-500">View and select from all themes</p>
+              </div>
+              <button 
+                onClick={() => setShowThemeModal(false)}
+                className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 text-lg"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Search */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+                <input 
+                  type="text"
+                  value={themeSearch}
+                  onChange={(e) => setThemeSearch(e.target.value)}
+                  placeholder="Search for a theme"
+                  className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button 
+                className="p-1.5 border rounded-lg hover:bg-gray-50 text-xs"
+              >
+                🔀
+              </button>
+            </div>
+            
+            {/* Category filters */}
+            <div className="flex gap-1">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => { setThemeFilter(cat); setThemeSearch(''); }}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                    themeFilter === cat && !themeSearch
+                      ? 'bg-gray-800 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Theme grid - scrollable */}
+          <div className="overflow-y-auto flex-1 p-3" style={{ maxHeight: '400px' }}>
+            <div className="grid grid-cols-2 gap-2">
+              {filteredThemes.map(theme => (
+                <ThemeCard
+                  key={theme.id}
+                  theme={theme}
+                  isSelected={selectedTheme === theme.id}
+                  onClick={() => setSelectedTheme(theme.id)}
+                />
+              ))}
+            </div>
+            {filteredThemes.length === 0 && (
+              <p className="text-center text-gray-500 text-sm py-8">No themes found</p>
+            )}
+          </div>
+          
+          {/* Footer - fixed */}
+          <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 flex-shrink-0">
+            <button
+              onClick={() => setShowThemeModal(false)}
+              className="px-4 py-1.5 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200 transition-all border bg-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => setShowThemeModal(false)}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-medium transition-all"
+            >
+              Select theme
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const LayoutDropdown = () => (
     <select
@@ -326,30 +723,8 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100">
         <nav className="flex items-center justify-between px-8 py-5">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 5 C28.284 5 35 11.716 35 20 C35 28.284 28.284 35 20 35" 
-                      stroke="url(#logoGradient)" strokeWidth="2.5" fill="none" 
-                      strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 10 Q12 15 14 20 Q12 25 14 30" 
-                      stroke="url(#logoGradient)" strokeWidth="2" fill="none" 
-                      strokeLinecap="round" strokeDasharray="2 3"/>
-                <path d="M26 10 Q28 15 26 20 Q28 25 26 30" 
-                      stroke="url(#logoGradient)" strokeWidth="2" fill="none" 
-                      strokeLinecap="round" strokeDasharray="2 3"/>
-                <line x1="14" y1="13" x2="26" y2="13" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="14" y1="18" x2="26" y2="18" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="14" y1="22" x2="26" y2="22" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="14" y1="27" x2="26" y2="27" stroke="url(#logoGradient)" strokeWidth="2" strokeLinecap="round"/>
-                <defs>
-                  <linearGradient id="logoGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#7C3AED" />
-                    <stop offset="100%" stopColor="#EC4899" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-b from-purple-600 to-pink-500 bg-clip-text text-transparent">IntelliClone</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">S</div>
+            <span className="text-xl font-bold text-gray-800">StudySlides</span>
           </div>
         </nav>
 
@@ -363,7 +738,7 @@ export default function App() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-3xl mx-auto">
             {/* Generate */}
             <button
               onClick={() => { setCreateMode('generate'); setView('generate'); }}
@@ -389,29 +764,16 @@ export default function App() {
               <p className="text-sm text-gray-500">Create from notes, an outline, or existing content</p>
             </button>
 
-            {/* Import */}
+            {/* Upload a file */}
             <button
               onClick={() => { setCreateMode('import'); setView('import'); }}
               className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all text-left"
             >
-              <div className="h-28 rounded-xl bg-gradient-to-br from-green-200 via-teal-200 to-cyan-300 mb-4 flex items-center justify-center">
-                <span className="text-4xl">📤</span>
+              <div className="h-28 rounded-xl bg-gradient-to-br from-purple-200 via-indigo-200 to-blue-300 mb-4 flex items-center justify-center">
+                <span className="text-4xl">📁</span>
               </div>
-              <h3 className="font-bold text-gray-900 mb-1">Import file or URL</h3>
-              <p className="text-sm text-gray-500">Enhance existing docs, presentations, or webpages</p>
-            </button>
-
-            {/* Generate from template */}
-            <button
-              onClick={() => { setCreateMode('generate'); setView('generate'); }}
-              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all text-left relative"
-            >
-              <div className="h-28 rounded-xl bg-gradient-to-br from-rose-200 via-pink-300 to-red-300 mb-4 flex items-center justify-center">
-                <span className="text-4xl">📑</span>
-              </div>
-              <h3 className="font-bold text-gray-900 mb-1">Generate from template</h3>
-              <p className="text-sm text-gray-500">Fill in and customize a structured template</p>
-              <span className="absolute top-4 right-4 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">NEW</span>
+              <h3 className="font-bold text-gray-900 mb-1">Upload a file</h3>
+              <p className="text-sm text-gray-500">Transform docs, PDFs, or text files into presentations</p>
             </button>
           </div>
         </main>
@@ -459,9 +821,9 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
-            {examplePrompts.map((ex, i) => (
+            {displayedPrompts.map((ex, i) => (
               <button
-                key={i}
+                key={`${ex.text}-${i}`}
                 onClick={() => setPrompt(ex.text)}
                 className="flex items-start gap-3 bg-blue-50/50 hover:bg-blue-100/50 rounded-xl p-4 text-left transition-all border border-transparent hover:border-blue-200"
               >
@@ -474,21 +836,30 @@ export default function App() {
 
           {/* Shuffle button */}
           <div className="text-center">
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border text-sm text-gray-600 hover:bg-gray-50">
+            <button 
+              onClick={shufflePrompts}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border text-sm text-gray-600 hover:bg-gray-50 hover:border-blue-300 transition-all"
+            >
               🔀 Shuffle
             </button>
           </div>
 
-          {/* Generate button (floating) */}
+          {/* Generate button (floating) - shows price */}
           {prompt.trim() && (
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2">
-              <button
-                onClick={startGeneration}
-                disabled={loading}
-                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold shadow-lg flex items-center gap-2"
-              >
-                Generate →
-              </button>
+              <div className="bg-white rounded-2xl shadow-xl p-4 flex items-center gap-4">
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">{numCards} slides</div>
+                  <div className="text-xl font-bold text-gray-900">{numCards * PRICE_PER_SLIDE} NOK</div>
+                </div>
+                <button
+                  onClick={initiatePayment}
+                  disabled={loading || isProcessingPayment}
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isProcessingPayment ? 'Processing...' : 'Pay & Generate →'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -497,6 +868,9 @@ export default function App() {
               {error}
             </div>
           )}
+          
+          {/* Theme Modal */}
+          <ThemeModal />
         </main>
       </div>
     );
@@ -637,109 +1011,125 @@ export default function App() {
 
   // IMPORT VIEW
   if (view === 'import') {
+    const handleFileUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      setUploadedFile(file);
+      
+      // Read file content
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target.result;
+        setFileContent(content);
+      };
+      
+      // Read as text for txt, md files
+      if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+        reader.readAsText(file);
+      } else {
+        // For other files, just store the name
+        setFileContent(`File uploaded: ${file.name}`);
+      }
+    };
+
+    const handleImportGenerate = () => {
+      if (uploadedFile) {
+        // Use file content or name as input
+        setPrompt(`Create a presentation based on this content: ${fileContent || uploadedFile.name}`);
+        setCreateMode('generate');
+        startGeneration();
+      }
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100 relative">
         <BackButton />
         
-        <main className="max-w-4xl mx-auto px-8 pt-16">
+        <main className="max-w-2xl mx-auto px-8 pt-16">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-3">
-              <span className="text-3xl">📤</span>
-              <h1 className="text-4xl font-serif italic text-gray-700">Import with AI</h1>
+              <span className="text-3xl">📁</span>
+              <h1 className="text-4xl font-serif italic text-gray-700">Upload a file</h1>
             </div>
-            <p className="text-gray-600">Select the file you'd like to transform</p>
+            <p className="text-gray-600">Select the file you'd like to transform into a presentation</p>
           </div>
 
-          {/* Import options */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {/* Upload a file */}
-            <div className="bg-purple-50 rounded-2xl p-6 border-2 border-purple-100 hover:border-purple-300 transition-all cursor-pointer">
-              <div className="h-20 flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-purple-200 rounded-xl flex items-center justify-center">
-                  <span className="text-3xl">📁</span>
+          {/* File upload area */}
+          <div className="bg-white rounded-2xl p-8 border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all mb-6">
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              accept=".txt,.md,.pdf,.docx,.pptx"
+              onChange={handleFileUpload}
+            />
+            
+            {!uploadedFile ? (
+              <label 
+                htmlFor="file-upload"
+                className="cursor-pointer block text-center"
+              >
+                <div className="w-20 h-20 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl">📄</span>
                 </div>
-              </div>
-              <h3 className="font-bold text-gray-900 mb-2">Upload a file</h3>
-              <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Powerpoint PPTX
+                <h3 className="font-bold text-gray-900 mb-2 text-lg">Drop your file here or click to browse</h3>
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>Supported formats:</p>
+                  <div className="flex justify-center gap-4 mt-2">
+                    <span className="px-3 py-1 bg-gray-100 rounded-full text-xs">.txt</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded-full text-xs">.md</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded-full text-xs">.pdf</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded-full text-xs">.docx</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Word docs
+                <button className="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium">
+                  Browse files
+                </button>
+              </label>
+            ) : (
+              <div className="text-center">
+                <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl">✅</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> PDFs
-                </div>
-              </div>
-              <button className="mt-4 text-purple-600 text-sm font-medium flex items-center gap-1">
-                Browse files <span>↗</span>
-              </button>
-            </div>
-
-            {/* Import from Drive */}
-            <div className="bg-blue-50 rounded-2xl p-6 border-2 border-blue-100 hover:border-blue-300 transition-all cursor-pointer">
-              <div className="h-20 flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-blue-200 rounded-xl flex items-center justify-center">
-                  <span className="text-3xl">📊</span>
-                </div>
-              </div>
-              <h3 className="font-bold text-gray-900 mb-2">Import from Drive</h3>
-              <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Google Slides
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Google Docs
-                </div>
-              </div>
-              <button className="mt-4 text-blue-600 text-sm font-medium flex items-center gap-1">
-                <span>🔍</span>
-              </button>
-            </div>
-
-            {/* Import from URL */}
-            <div className="bg-green-50 rounded-2xl p-6 border-2 border-green-200 hover:border-green-400 transition-all">
-              <div className="h-20 flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-green-200 rounded-xl flex items-center justify-center">
-                  <span className="text-3xl">🌐</span>
-                </div>
-              </div>
-              <h3 className="font-bold text-gray-900 mb-2">Import from URL</h3>
-              <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Webpages
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Blog posts or articles
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Notion docs (public only)
-                </div>
-              </div>
-              
-              {/* URL input */}
-              <div className="mt-4">
-                <input
-                  type="url"
-                  value={importUrl}
-                  onChange={e => setImportUrl(e.target.value)}
-                  placeholder="Paste URL here..."
-                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                {importUrl.trim() && (
-                  <button
-                    onClick={startGeneration}
-                    className="mt-2 w-full py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium"
+                <h3 className="font-bold text-gray-900 mb-2 text-lg">{uploadedFile.name}</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  {(uploadedFile.size / 1024).toFixed(1)} KB
+                </p>
+                <div className="flex justify-center gap-3">
+                  <button 
+                    onClick={() => { setUploadedFile(null); setFileContent(''); }}
+                    className="px-4 py-2 border border-gray-300 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50"
                   >
-                    Import →
+                    Remove
                   </button>
-                )}
+                  <button 
+                    onClick={handleImportGenerate}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium"
+                  >
+                    Generate presentation →
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
+
+          {/* Preview of file content (for text files) */}
+          {fileContent && fileContent.length < 1000 && !fileContent.startsWith('File uploaded:') && (
+            <div className="bg-gray-50 rounded-xl p-4 mb-6">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Preview:</h4>
+              <p className="text-sm text-gray-600 whitespace-pre-wrap line-clamp-6">{fileContent.substring(0, 500)}...</p>
+            </div>
+          )}
 
           <p className="text-center text-gray-500 text-sm">
-            If your file isn't supported, you can also <button className="text-blue-600 underline">paste in text</button>
+            If your file isn't supported, you can also{' '}
+            <button 
+              onClick={() => { setCreateMode('paste'); setView('paste'); }}
+              className="text-blue-600 underline hover:text-blue-800"
+            >
+              paste in text
+            </button>
           </p>
 
           {error && (
@@ -807,30 +1197,8 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-b from-cyan-50 via-blue-50 to-blue-100">
         <nav className="flex items-center justify-between px-8 py-5">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 5 C28.284 5 35 11.716 35 20 C35 28.284 28.284 35 20 35" 
-                      stroke="url(#logoGradient2)" strokeWidth="2.5" fill="none" 
-                      strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 10 Q12 15 14 20 Q12 25 14 30" 
-                      stroke="url(#logoGradient2)" strokeWidth="2" fill="none" 
-                      strokeLinecap="round" strokeDasharray="2 3"/>
-                <path d="M26 10 Q28 15 26 20 Q28 25 26 30" 
-                      stroke="url(#logoGradient2)" strokeWidth="2" fill="none" 
-                      strokeLinecap="round" strokeDasharray="2 3"/>
-                <line x1="14" y1="13" x2="26" y2="13" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="14" y1="18" x2="26" y2="18" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="14" y1="22" x2="26" y2="22" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="14" y1="27" x2="26" y2="27" stroke="url(#logoGradient2)" strokeWidth="2" strokeLinecap="round"/>
-                <defs>
-                  <linearGradient id="logoGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#7C3AED" />
-                    <stop offset="100%" stopColor="#EC4899" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-b from-purple-600 to-pink-500 bg-clip-text text-transparent">IntelliClone</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold">S</div>
+            <span className="text-xl font-bold">StudySlides</span>
           </div>
           <button onClick={startNew} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
             + Create New
